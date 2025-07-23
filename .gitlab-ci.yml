@@ -1,0 +1,73 @@
+image: hashicorp/terraform:light
+
+stages:
+  - validate
+  - plan
+  - apply
+
+validate:
+  stage: validate
+  script:
+    - terraform -chdir=terraform init
+    - terraform -chdir=terraform validate
+
+plan_test:
+  stage: plan
+  script:
+    - terraform -chdir=terraform init
+    - terraform -chdir=terraform plan -var-file=test.tfvars -out=plan_test.tfplan
+  artifacts:
+    paths:
+      - terraform/plan_test.tfplan
+
+apply_test:
+  stage: apply
+  script:
+    - terraform -chdir=terraform apply -auto-approve plan_test.tfplan
+  environment:
+    name: test
+  when: manual
+  dependencies:
+    - plan_test
+
+plan_uat:
+  stage: plan
+  script:
+    - terraform -chdir=terraform init
+    - terraform -chdir=terraform plan -var-file=uat.tfvars -out=plan_uat.tfplan
+  artifacts:
+    paths:
+      - terraform/plan_uat.tfplan
+  needs:
+    - apply_test
+
+apply_uat:
+  stage: apply
+  script:
+    - terraform -chdir=terraform apply -auto-approve plan_uat.tfplan
+  environment:
+    name: uat
+  when: manual
+  dependencies:
+    - plan_uat
+
+plan_prod:
+  stage: plan
+  script:
+    - terraform -chdir=terraform init
+    - terraform -chdir=terraform plan -var-file=prod.tfvars -out=plan_prod.tfplan
+  artifacts:
+    paths:
+      - terraform/plan_prod.tfplan
+  needs:
+    - apply_uat
+
+apply_prod:
+  stage: apply
+  script:
+    - terraform -chdir=terraform apply -auto-approve plan_prod.tfplan
+  environment:
+    name: prod
+  when: manual
+  dependencies:
+    - plan_prod
